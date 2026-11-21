@@ -1,0 +1,25 @@
+firetv-home third-party notices
+
+The code in this repository is MIT licensed (see LICENSE). The image assets below have their own terms.
+
+1. Optional "bali" background (app/src/main/res/drawable-nodpi/bg_bali.webp)
+
+   Selected with "background": "bali" in config.json. Not the default.
+
+   "Bali- Jatiluwih rice terraces - 50281829296.jpg" (Jatiluwih, Bali, Indonesia)
+   Author: Jorge Franganillo
+   License: CC BY 2.0, https://creativecommons.org/licenses/by/2.0
+   Source: https://commons.wikimedia.org/wiki/File:Bali-_Jatiluwih_rice_terraces_-_50281829296.jpg
+   Changes: scaled, center-cropped to 1920x1080, WebP-compressed.
+
+   The home screen shows a short credit in the bottom-right corner while this background is active.
+
+2. Default background (app/src/main/res/drawable-nodpi/bg_default.webp)
+
+   The default background. CC0 needs no attribution; it is given as a courtesy.
+
+   File: "Hebgen Lake at dusk 03.jpg"
+   Author: Z3lvs
+   License: CC0 1.0 Universal Public Domain Dedication, https://creativecommons.org/publicdomain/zero/1.0/
+   Source: https://commons.wikimedia.org/wiki/File:Hebgen_Lake_at_dusk_03.jpg
+   Changes: center-cropped to 1920x1080, WebP-compressed, metadata stripped.

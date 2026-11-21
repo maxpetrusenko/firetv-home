@@ -1,0 +1,29 @@
+{
+  "ha_url": "http://homeassistant.local:8123",
+  "ha_token": "PASTE_A_LONG_LIVED_ACCESS_TOKEN",
+
+  "calendars": [
+    { "type": "ics", "url": "https://calendar.google.com/calendar/ical/<your-secret-id>/basic.ics", "label": "Home" },
+    { "type": "ics", "url": "https://example.com/<your-feed>.ics", "label": "Work" },
+    { "type": "ha_calendar", "entity": "calendar.example", "label": "Shared" }
+  ],
+
+  "reminders": [
+    {
+      "type": "ha_todo",
+      "entities": [
+        { "entity": "todo.example_list", "label": "Household" },
+        { "entity": "todo.shopping_list", "label": "To buy" }
+      ]
+    },
+    { "type": "apple_reminders", "url": "http://<mac-host>:8765/reminders.json" }
+  ],
+
+  "background": "default",
+  "calendar_alert_minutes": 10,
+  "app_order": [
+    "org.smarttube.stable",
+    "com.netflix.ninja",
+    "org.videolan.vlc"
+  ]
+}

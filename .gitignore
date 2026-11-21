@@ -1,0 +1,28 @@
+# Build output
+.gradle/
+build/
+captures/
+
+# Local and private configuration (never commit)
+local.properties
+*.local*
+*.keystore
+*.jks
+keystore.properties
+config.json
+!config.example.json
+
+# Logs, scratch, backups
+*.log
+*.bak*
+scratch/
+screenshots/
+!docs/screenshot.png
+
+# Editors and OS
+.idea/
+*.iml
+.DS_Store
+
+# Paparazzi snapshots (docs/screenshot.png is the committed copy)
+app/src/test/snapshots/
