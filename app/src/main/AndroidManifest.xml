@@ -1,15 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- A launcher must list every installed app. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <application
@@ -36,18 +34,6 @@
             android:name=".AllAppsActivity"
             android:exported="false" />
 
-        <!-- Exported so the debug action can be sent from adb; see README. -->
-        <receiver
-            android:name=".AlertReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="app.firetvhome.ALERT" />
-                <action android:name="app.firetvhome.DEBUG_ALERT" />
-            </intent-filter>
-        </receiver>
-
         <!-- Push-refresh contract: adb shell am broadcast, action app.firetvhome.REFRESH, extras block (string) and ts (long).
              The DUMP permission limits senders to shell/system; onReceive does no I/O beyond one prefs write. -->
         <receiver
@@ -58,19 +44,5 @@
                 <action android:name="app.firetvhome.REFRESH" />
             </intent-filter>
         </receiver>
-
-        <service
-            android:name=".AlertOverlayService"
-            android:exported="false" />
-
-        <service
-            android:name=".NotifService"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
     </application>
 </manifest>

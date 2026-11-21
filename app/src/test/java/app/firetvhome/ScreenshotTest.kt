@@ -32,12 +32,13 @@ class ScreenshotTest {
         val now = at(0, 8, 0)
         val screen = HomeScreen(ctx, Config.BG_DEFAULT)
         val events = listOf(
-            Ev("Dentist", at(0, 15, 30), at(0, 16, 15), false, "1", "Home"),
-            Ev("Team call", at(1, 10, 0), at(1, 10, 30), false, "2", "Work"),
-            Ev("Soccer practice", at(1, 17, 30), at(1, 19, 0), false, "3", "Home"),
-            Ev("Pick up groceries", at(2, 18, 0), at(2, 18, 45), false, "4", "Home"),
-            Ev("Project review", at(3, 14, 0), at(3, 15, 0), false, "5", "Work"),
-            Ev("Library day", at(4, 0, 0), at(5, 0, 0), true, "6", "Home"),
+            Ev("Dentist appointment", at(0, 15, 30), at(0, 16, 15), false, "1", "Home"),
+            Ev("Pay property tax", at(0, 0, 0), at(1, 0, 0), true, "2", "Home"),
+            Ev("Team call", at(1, 10, 0), at(1, 10, 30), false, "3", "Work"),
+            Ev("Parents night out: bring a snack to share and a signed permission slip for the field trip", at(1, 17, 30), at(1, 19, 0), false, "4", "Home"),
+            Ev("Pick up groceries", at(2, 18, 0), at(2, 18, 45), false, "5", "Home"),
+            Ev("Project review", at(3, 14, 0), at(3, 15, 0), false, "6", "Work"),
+            Ev("Library day", at(4, 0, 0), at(5, 0, 0), true, "7", "Home"),
         )
         // layoutlib freezes its own clock, so pin the clock views to the demo time with literal patterns.
         fun literal(pattern: String) = "'" + java.text.SimpleDateFormat(pattern, java.util.Locale.US).format(java.util.Date(now)) + "'"
@@ -53,10 +54,10 @@ class ScreenshotTest {
             ),
             false,
         )
-        screen.renderNotifs(listOf(
-            NotifService.Item("Messages", "Package delivered", "Your parcel was left at the front door."),
-            NotifService.Item("Mail", "Weekly summary", "3 new messages"),
-        ))
+        screen.renderBirthdays(true, listOf(
+            Birthdays.Item(at(2, 0, 0), "Alex"),
+            Birthdays.Item(at(9, 0, 0), "Sam"),
+        ), false, 30, now)
         val tiles = listOf(
             "Video" to R.drawable.ic_launcher, "Music" to R.drawable.ic_launcher, "Browser" to R.drawable.ic_launcher,
             "Photos" to R.drawable.ic_launcher, "All apps" to R.drawable.ic_apps, "Settings" to R.drawable.ic_settings,

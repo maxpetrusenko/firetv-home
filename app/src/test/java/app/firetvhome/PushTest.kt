@@ -81,7 +81,7 @@ class PushTest {
         assertEquals(Push.ALL, Push.route(null))
         assertEquals(Push.ALL, Push.route(""))
         assertEquals(emptySet<String>(), Push.route("bogus"))
-        assertEquals(setOf("calendar", "reminders", "trips"), Push.ALL)
+        assertEquals(setOf("calendar", "reminders", "trips", "birthdays"), Push.ALL)
     }
 
     @Test fun defaultManifestHasNoHomeCategory() {

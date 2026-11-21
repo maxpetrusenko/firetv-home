@@ -13,13 +13,13 @@ import java.util.Locale
 
 class TodoList(val label: String, val items: List<String>)
 class Ev(val title: String, val start: Long, val end: Long, val allDay: Boolean, val uid: String = "", val source: String = "") {
-    /** Stable id of one instance, used to alert once. */
-    val key get() = "$uid@$start"
     fun copy(source: String) = Ev(title, start, end, allDay, uid, source)
 }
 
 object Data {
     private const val TAG = "firetv-home"
+
+    internal fun fetch(url: String): String = call(url)
 
     private fun call(url: String, method: String = "GET", token: String? = null, body: String? = null): String {
         if (url.startsWith("file:")) return java.io.File(java.net.URI(url)).readText()
@@ -82,16 +82,10 @@ object Data {
             ?: throw IOException("reminders file is not valid schema v1")
     }
 
-    // ---- Calendar: today through the next 7 days ----
-    const val DAYS = 8
-
+    // ---- Calendar: today through the next c.calDays days (the filter runs after sources merge, in CalendarLogic) ----
     fun calendar(c: Config): List<Ev> {
-        val s = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        }
-        val from = s.timeInMillis
-        s.add(Calendar.DAY_OF_MONTH, DAYS)
-        val to = s.timeInMillis
+        val from = dayStart(System.currentTimeMillis())
+        val to = Calendar.getInstance().apply { timeInMillis = from; add(Calendar.DAY_OF_MONTH, c.calDays) }.timeInMillis
         val lists = ArrayList<List<Ev>>()
         var last: Exception? = null
         for (src in c.calendars) {
@@ -113,7 +107,7 @@ object Data {
     /** Concatenate per-source event lists into one list sorted by start (stable, so equal starts keep source order). */
     fun mergeEvents(lists: List<List<Ev>>): List<Ev> = lists.flatten().sortedBy { it.start }
 
-    private fun haEvents(c: Config, entity: String, dayStart: Long, dayEnd: Long): List<Ev> {
+    internal fun haEvents(c: Config, entity: String, dayStart: Long, dayEnd: Long): List<Ev> {
         val f = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
         val q = "start=" + URLEncoder.encode(f.format(dayStart), "UTF-8") +
             "&end=" + URLEncoder.encode(f.format(dayEnd), "UTF-8")

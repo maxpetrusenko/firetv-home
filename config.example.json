@@ -19,8 +19,14 @@
     { "type": "apple_reminders", "url": "http://<mac-host>:8765/reminders.json" }
   ],
 
+  "calendar": {
+    "exclude": ["drop-?in care"],
+    "include_exceptions": ["parents'? night out"],
+    "days": 8
+  },
+  "birthdays": { "type": "ics", "url": "https://example.com/birthdays.ics", "days": 30 },
+
   "background": "default",
-  "calendar_alert_minutes": 10,
   "app_order": [
     "org.smarttube.stable",
     "com.netflix.ninja",

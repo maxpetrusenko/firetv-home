@@ -15,7 +15,8 @@ object Push {
     const val CALENDAR = "calendar"
     const val REMINDERS = "reminders"
     const val TRIPS = "trips"
-    val ALL = linkedSetOf(CALENDAR, REMINDERS, TRIPS)
+    const val BIRTHDAYS = "birthdays"
+    val ALL = linkedSetOf(CALENDAR, REMINDERS, TRIPS, BIRTHDAYS)
     const val FRESH_MS = 2 * 3_600_000L
     private const val SKEW_MS = 5 * 60_000L
 

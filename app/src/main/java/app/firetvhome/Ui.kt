@@ -35,8 +35,10 @@ object Ui {
     private var photo: Bitmap? = null
     private var photoName = ""
 
-    /** Photo background (decoded once, RGB_565, downsampled to the screen) under a dark gradient, with [content] on top. */
+    /** Photo background (decoded once, RGB_565, downsampled to about half the screen) under a dark gradient, with [content] on top. */
     fun withBackground(c: Context, content: View, bgName: String = Config.BG_DEFAULT): View {
+        // Opaque 16-bit window: halves the 1080p window buffers (about 8 MB each on the TV), the biggest single RAM cost of a visible home.
+        (c as? Activity)?.window?.setFormat(android.graphics.PixelFormat.RGB_565)
         val root = FrameLayout(c)
         root.setBackgroundColor(BG)
         if (photoName != bgName) { photo = null; photoName = bgName }
@@ -46,7 +48,8 @@ object Ui {
             val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeResource(c.resources, res, o)
             var s = 1
-            while (o.outWidth / (s * 2) >= dm.widthPixels && o.outHeight / (s * 2) >= dm.heightPixels) s *= 2
+            // Half screen resolution is enough: the photo sits under a dark overlay and is scaled up with CENTER_CROP.
+            while (o.outWidth / (s * 2) >= dm.widthPixels / 2 && o.outHeight / (s * 2) >= dm.heightPixels / 2) s *= 2
             val d = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565; inSampleSize = s }
             photo = BitmapFactory.decodeResource(c.resources, res, d)
         } catch (e: Throwable) { }
@@ -127,4 +130,33 @@ object Ui {
     }
 
     fun gone(v: View, hide: Boolean) { v.visibility = if (hide) View.GONE else View.VISIBLE }
+}
+
+/**
+ * Title that wraps to [fitLines] lines without an ellipsis. When the text needs more lines at [maxSp],
+ * the size steps down (by [stepSp], to [minSp]) until it fits. Measures with StaticLayout on the first measure per width.
+ */
+class FitTextView(c: Context, private val maxSp: Float, private val minSp: Float, private val stepSp: Float = 1f, private val fitLines: Int = 2) : TextView(c) {
+    private var fittedWidth = -1
+
+    init {
+        maxLines = fitLines
+        includeFontPadding = false
+        setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, maxSp)
+    }
+
+    override fun onMeasure(widthSpec: Int, heightSpec: Int) {
+        val w = View.MeasureSpec.getSize(widthSpec) - paddingLeft - paddingRight
+        if (w > 0 && w != fittedWidth && View.MeasureSpec.getMode(widthSpec) != View.MeasureSpec.UNSPECIFIED) {
+            fittedWidth = w
+            val dm = resources.displayMetrics
+            val p = android.text.TextPaint(paint)
+            val sp = TextFit.pick(maxSp, minSp, stepSp, fitLines) { s ->
+                p.textSize = s * dm.scaledDensity
+                android.text.StaticLayout.Builder.obtain(text, 0, text.length, p, w).build().lineCount
+            }
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, sp)
+        }
+        super.onMeasure(widthSpec, heightSpec)
+    }
 }

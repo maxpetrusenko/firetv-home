@@ -14,7 +14,7 @@ class ConfigTest {
             val c = Config.parse(t)
             assertFalse(c.hasCalendar); assertFalse(c.hasTodos)
             assertEquals(Config.DEFAULT_APPS, c.appOrder)
-            assertEquals(10, c.alertMinutes)
+            assertEquals(8, c.calDays); assertTrue(c.exclude.isEmpty()); assertTrue(c.birthdays == null)
             assertEquals(Config.BG_DEFAULT, c.background)
         }
     }
@@ -61,7 +61,6 @@ class ConfigTest {
         assertEquals("http://mac.example:8765/reminders.json", (c.reminders[1] as RemSource.AppleReminders).url)
         assertEquals(File("/base", "reminders.json").path, (c.reminders[2] as RemSource.AppleReminders).file)
         assertEquals(Config.BG_BALI, c.background)
-        assertEquals(0, c.alertMinutes)
     }
 
     @Test fun providerListReplacesLegacyKeys() {

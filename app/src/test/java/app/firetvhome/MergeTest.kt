@@ -21,6 +21,6 @@ class MergeTest {
 
     @Test fun copyWithSourceKeepsEvent() {
         val e = Ev("t", 5, 9, true, "u").copy("Lbl")
-        assertEquals("Lbl", e.source); assertEquals("u@5", e.key); assertEquals(true, e.allDay)
+        assertEquals("Lbl", e.source); assertEquals("u", e.uid); assertEquals(true, e.allDay)
     }
 }

@@ -25,8 +25,11 @@ class Config(
     val calendars: List<CalSource>,
     val reminders: List<RemSource>,
     val appOrder: List<String>,
-    val alertMinutes: Int,
     val background: String,
+    val exclude: List<String> = emptyList(),
+    val includeExceptions: List<String> = emptyList(),
+    val calDays: Int = DEFAULT_CAL_DAYS,
+    val birthdays: BirthdayCfg? = null,
 ) {
     val haReady get() = haUrl.isNotEmpty() && haToken.isNotEmpty()
     val hasCalendar get() = calendars.isNotEmpty()
@@ -34,7 +37,12 @@ class Config(
     /** Source labels are shown in the week view only when there is more than one source. */
     val showCalLabels get() = calendars.size > 1
 
+    /** Birthdays source. type: block | ics | ha | google. url for ics, entity for ha. */
+    class BirthdayCfg(val type: String, val url: String, val entity: String, val days: Int)
+
     companion object {
+        const val DEFAULT_CAL_DAYS = 8
+        const val DEFAULT_BDAY_DAYS = 30
         const val BG_DEFAULT = "default"
         const val BG_BALI = "bali"
 
@@ -105,13 +113,29 @@ class Config(
 
             val apps = ArrayList<String>()
             j.optJSONArray("app_order")?.let { a -> for (i in 0 until a.length()) apps.add(a.optString(i)) }
+            // Calendar filter and window: an optional "calendar" object ({"exclude", "include_exceptions", "days"}) or top-level keys.
+            val cal = j.optJSONObject("calendar") ?: JSONObject()
+            fun list(k: String) = strings(cal.optJSONArray(k) ?: j.optJSONArray(k))
+            val days = (if (cal.has("days")) cal.optInt("days", DEFAULT_CAL_DAYS) else j.optInt("calendar_days", DEFAULT_CAL_DAYS)).coerceIn(1, 31)
+            val bd = j.optJSONObject("birthdays")?.let { b ->
+                BirthdayCfg(
+                    b.optString("type").trim().lowercase(), b.optString("url").trim(), b.optString("entity").trim(),
+                    b.optInt("days", DEFAULT_BDAY_DAYS).coerceIn(1, 366),
+                )
+            }?.takeIf { it.type.isNotEmpty() }
             val bg = (j.optString("background").ifEmpty { j.optString("theme") }).trim().lowercase()
             return Config(
                 haUrl, haToken, cals, rems,
                 if (apps.isEmpty()) DEFAULT_APPS else apps,
-                j.optInt("calendar_alert_minutes", 10).coerceAtLeast(0),
                 if (bg == BG_BALI) BG_BALI else BG_DEFAULT,
+                list("exclude"), list("include_exceptions"), days, bd,
             )
+        }
+
+        private fun strings(a: JSONArray?): List<String> {
+            val out = ArrayList<String>()
+            if (a != null) for (i in 0 until a.length()) a.optString(i).trim().takeIf { it.isNotEmpty() }?.let { out.add(it) }
+            return out
         }
 
         private fun todoEntities(a: JSONArray?): List<Pair<String, String>> {

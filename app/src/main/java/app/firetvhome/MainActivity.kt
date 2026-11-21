@@ -3,17 +3,9 @@ package app.firetvhome
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.text.format.DateFormat
-import android.view.Gravity
 import android.view.KeyEvent
-import android.view.View
-import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
-import android.widget.TextClock
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : Activity(), Push.Listener {
@@ -29,6 +21,8 @@ class MainActivity : Activity(), Push.Listener {
     private var todoErr = false
     private var events: List<Ev>? = null
     private var calErr = false
+    private var bdays: List<Birthdays.Item>? = null
+    private var bdayErr = false
     private val queued = HashSet<String>() // blocks pushed while a reload was running
 
     private val tick = object : Runnable {
@@ -38,7 +32,6 @@ class MainActivity : Activity(), Push.Listener {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         cfg = Config.load(this)
-        try { android.service.notification.NotificationListenerService.requestRebind(android.content.ComponentName(this, NotifService::class.java)) } catch (e: Exception) { }
         screen = HomeScreen(this, cfg.background)
         appsRow = screen.appsRow
         appsScroll = screen.appsScroll
@@ -68,7 +61,6 @@ class MainActivity : Activity(), Push.Listener {
     override fun onResume() {
         super.onResume()
         HomeSwitch.onResume(this)
-        NotifService.onChange = { Ui.main.post { renderNotifs() } }
         Push.setListener(this)
         Ui.main.removeCallbacks(tick)
         Ui.main.post(tick)
@@ -78,7 +70,6 @@ class MainActivity : Activity(), Push.Listener {
 
     override fun onPause() {
         super.onPause()
-        NotifService.onChange = null
         Push.setListener(null)
         Ui.main.removeCallbacks(tick)
     }
@@ -104,12 +95,12 @@ class MainActivity : Activity(), Push.Listener {
     private fun refresh(blocks: Set<String> = Push.ALL, ts: Long = 0L) {
         cfg = Config.load(this)
         buildApps()
-        renderNotifs()
         render()
         val doCal = Push.CALENDAR in blocks
         val doRem = Push.REMINDERS in blocks
+        val doBday = Push.BIRTHDAYS in blocks
         Push.clearDirty(applicationContext, blocks) // trips has no card yet; clearing it is the whole reload
-        if (!(doCal && cfg.hasCalendar) && !(doRem && cfg.hasTodos)) return
+        if (!(doCal && cfg.hasCalendar) && !(doRem && cfg.hasTodos) && !(doBday && cfg.birthdays != null)) return
         if (!busy.compareAndSet(false, true)) { queued.addAll(blocks); return }
         val c = cfg
         val app = applicationContext
@@ -121,15 +112,17 @@ class MainActivity : Activity(), Push.Listener {
             if (doRem && c.hasTodos) try { t = Data.todos(c) } catch (x: Exception) { te = true; android.util.Log.w("firetv-home", "todos: ${x.javaClass.simpleName}") }
             if (doCal && c.hasCalendar) {
                 try {
-                    // Pushed file first when fresh (under 2 h); ICS/HA stays the fallback.
-                    e = Push.freshCalendar(app, System.currentTimeMillis()) ?: Data.calendar(c)
-                    Alerts.save(app, e)
+                    // Pushed file first when fresh (under 2 h); ICS/HA stays the fallback. The filter runs after the merge.
+                    e = CalendarLogic.filter(Push.freshCalendar(app, System.currentTimeMillis()) ?: Data.calendar(c), c.exclude, c.includeExceptions)
                 } catch (x: Exception) { ce = true; android.util.Log.w("firetv-home", "calendar: ${x.javaClass.simpleName}") }
-                try { Alerts.check(app) } catch (x: Exception) { android.util.Log.w("firetv-home", "alerts: ${x.javaClass.simpleName}") }
             }
+            var bl: List<Birthdays.Item>? = null
+            var be = false
+            if (doBday && c.birthdays != null) try { bl = Birthdays.load(app, c, System.currentTimeMillis()) } catch (x: Exception) { be = true; android.util.Log.w("firetv-home", "birthdays: ${x.javaClass.simpleName}") }
             Ui.main.post {
                 if (doRem && c.hasTodos) { if (t != null) todos = t; todoErr = te }
                 if (doCal && c.hasCalendar) { if (e != null) events = e; calErr = ce }
+                if (doBday && c.birthdays != null) { if (bl != null) bdays = bl; bdayErr = be }
                 busy.set(false)
                 render()
                 if (ts > 0) android.util.Log.i(Push.TAG, "render block=${blocks.joinToString(",")} ts=$ts now=${System.currentTimeMillis()}")
@@ -139,9 +132,9 @@ class MainActivity : Activity(), Push.Listener {
     }
 
     private fun render() {
-        screen.renderCalendar(cfg.hasCalendar, events, calErr, cfg.showCalLabels, System.currentTimeMillis())
+        val now = System.currentTimeMillis()
+        screen.renderCalendar(cfg.hasCalendar, events, calErr, cfg.showCalLabels, now, cfg.calDays)
+        screen.renderBirthdays(cfg.birthdays != null, bdays, bdayErr, cfg.birthdays?.days ?: Config.DEFAULT_BDAY_DAYS, now)
         screen.renderReminders(cfg.hasTodos, todos, todoErr)
     }
-
-    private fun renderNotifs() = screen.renderNotifs(if (NotifService.connected) NotifService.recent(3) else null)
 }

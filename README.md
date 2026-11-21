@@ -1,6 +1,6 @@
 # firetv-home
 
-firetv-home is a lightweight, ad-free home screen for Fire TV and Android TV. It shows a clock, a week view of one or more calendars, reminders, recent notifications and a row of your apps. It is written in Kotlin with plain Android Views (no Compose, no Leanback, no AppCompat) and runs on Fire OS 6 and later (Android API 25 and later).
+firetv-home is a lightweight, ad-free home screen for Fire TV and Android TV. It shows a clock, a day-by-day calendar of one or more sources, birthdays, reminders and a row of your apps. It is written in Kotlin with plain Android Views (no Compose, no Leanback, no AppCompat) and runs on Fire OS 6 and later (Android API 25 and later).
 
 ![Home screen with demo data](docs/screenshot.png)
 
@@ -9,10 +9,11 @@ Rendered off-device with Paparazzi from the app's real views and invented demo d
 ## Features
 
 - Clock and date, following the system 12/24 hour setting.
-- Calendar card: today plus the next 7 days, up to 6 rows. Sources are merged and sorted by start time. Providers: any iCal (`.ics`) feed, including a Google Calendar "secret address", or a Home Assistant calendar entity. When more than one source is configured, each row shows the source label.
+- Two-column home: the calendar on the left, Birthdays above Reminders on the right.
+- Calendar card: today plus the next `days` days (default 8), grouped by day with headers "Today", "Tomorrow" and "Tue Nov 24". All-day events come first in each day. Titles wrap to two lines with no ellipsis; a long title steps its font size down until it fits. Rows that do not fit the card are dropped. Sources are merged, then filtered. Providers: any iCal (`.ics`) feed, including a Google Calendar "secret address", or a Home Assistant calendar entity. When more than one source is configured, each row shows the source label.
+- Calendar filter: hide events by title with case-insensitive regular expressions (`exclude`), with `include_exceptions` to keep some of them.
+- Birthdays card: upcoming birthdays within a window (default 30 days) from a pushed file, an iCal feed or a Home Assistant calendar. Hidden when not configured.
 - Reminders card: incomplete items from Home Assistant todo lists, or from Apple Reminders through an optional macOS helper.
-- Pre-event alert: an overlay card and a notification shortly before each timed event.
-- Recent notifications (read-only listener; it never dismisses anything). Hidden until notification access is granted.
 - One row of apps in the order you choose, an "All apps" grid and a Settings tile.
 - Optional push refresh over `adb shell am broadcast`.
 - Two backgrounds: a neutral default and an optional photo ("bali").
@@ -52,11 +53,24 @@ The config is read again on every refresh (on resume, on a push, and every 15 mi
 | `calendars` | list | empty | Calendar providers, see below. When present, the old `calendar_entity` and `ics_url` keys are ignored. |
 | `reminders` | list | empty | Reminder providers, see below. When present, the old `todo_entities` key is ignored. |
 | `background` | string | `default` | `default` for the neutral image, `bali` for the optional photo. `theme` is accepted as an alias. Unknown values fall back to `default`. |
-| `calendar_alert_minutes` | integer | `10` | Minutes before a timed event to alert. `0` turns alerts off. |
+| `calendar` | object | none | Calendar window and filter: `{"exclude": [...], "include_exceptions": [...], "days": 8}`. The same keys also work at top level (`exclude`, `include_exceptions`, `calendar_days`); the object wins. |
+| `calendar.days` | integer | `8` | Days shown, starting today. Clamped to 1-31. |
+| `calendar.exclude` | list of strings | empty | Events whose title matches any entry are hidden. Each entry is a case-insensitive regular expression; an entry that is not a valid regex is matched as plain text. |
+| `calendar.include_exceptions` | list of strings | empty | Events that match an `exclude` entry but also match one of these are kept. Same matching rules. |
+| `birthdays` | object | none | Birthdays source, see below. The card is hidden when this is missing. |
 | `app_order` | list of strings | a short built-in list | Package names for the app row. Missing apps are skipped. The first one gets focus. |
 | `calendar_entity` | string | empty | Old flat key. Home Assistant calendar entity id. Same as one `ha_calendar` provider. |
 | `ics_url` | string | empty | Old flat key. iCal feed URL. Used only when no `calendar_entity` is usable. Same as one `ics` provider. |
 | `todo_entities` | list | empty | Old flat key. Entity ids or `{"entity", "label"}` objects. Same as one `ha_todo` provider. |
+
+Birthday providers (`birthdays`):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `type` | string | `block`, `ics`, `ha` or `google`. |
+| `url` | string | For `ics`: the feed URL. |
+| `entity` | string | For `ha`: a Home Assistant calendar entity id. Needs `ha_url` and `ha_token`. |
+| `days` | integer | Window in days from today. Default `30`, clamped to 1-366. |
 
 Calendar providers (`calendars`):
 
@@ -75,6 +89,16 @@ Reminder providers (`reminders`):
 | `entities` | list | For `ha_todo`: `{"entity": "todo.example_list", "label": "Household"}` objects. Needs `ha_url` and `ha_token`. |
 | `url` | string | For `apple_reminders`: URL of the JSON file served by the companion helper. |
 | `file` | string | For `apple_reminders`: path of the JSON file, absolute or relative to the app files directory. Used when `url` is empty. |
+
+Example filter: hide anything titled "Drop-in care" unless the title also says "Parents night out".
+
+    "calendar": {
+      "exclude": ["drop-?in care"],
+      "include_exceptions": ["parents'? night out"],
+      "days": 8
+    }
+
+The filter runs once, after all calendar sources (and a pushed `blocks/calendar.json`) are merged, on the event title only.
 
 If one calendar source fails (network, bad feed), the others are still shown. The ICS parser handles all-day and multi-day events, TZID, UTC and floating times, RRULE (DAILY, WEEKLY, MONTHLY, YEARLY with INTERVAL, COUNT, UNTIL, BYDAY such as `2TU` or `-1FR`, BYMONTHDAY, BYMONTH), EXDATE, RECURRENCE-ID overrides and STATUS:CANCELLED.
 
@@ -130,29 +154,41 @@ The app refreshes on resume and every 15 minutes. To refresh sooner, send a broa
 
     adb -s <tv-ip>:5555 shell am broadcast -a app.firetvhome.REFRESH -n app.firetvhome/.RefreshReceiver --es block calendar --el ts "$(date +%s000)"
 
-`block` is `calendar`, `reminders`, `trips` or `all` (the default when omitted). `ts` is optional and only appears in the log. The receiver only accepts broadcasts from the adb shell or the system. If the app is not in front, the refresh is applied the next time it resumes. You can also drop a file `blocks/calendar.json` (schema `{"v":1,"generated_at_ms":...,"events":[{"id","title","start","end","all_day"}]}`) into the app files directory. When it is less than two hours old it is used instead of the configured calendar sources.
+`block` is `calendar`, `reminders`, `trips`, `birthdays` or `all` (the default when omitted). `ts` is optional and only appears in the log. The receiver only accepts broadcasts from the adb shell or the system. If the app is not in front, the refresh is applied the next time it resumes. You can also drop a file `blocks/calendar.json` (schema `{"v":1,"generated_at_ms":...,"events":[{"id","title","start","end","all_day"}]}`) into the app files directory. When it is less than two hours old it is used instead of the configured calendar sources.
 
-## Event alerts
+## Birthdays
 
-Each refresh caches the event list in the app's private files directory and arms one exact alarm for the earliest upcoming timed event minus `calendar_alert_minutes`. The app then shows an overlay card at the top right for 15 seconds and posts a notification, and arms the next alarm. Each event instance alerts once. All-day events never alert. After a reboot or app update the alarm is re-armed from the cached list. There is no polling service.
+Add a `birthdays` object to `config.json`. Birthdays within `days` days are listed soonest first, up to five, as "Today — Name", "Tomorrow — Name" or "Sat Nov 29 — Name".
 
-The overlay needs "display over other apps", which Fire OS has no screen for. Grant it over adb (without it only the notification appears):
+Pushed file (`type` `block`): the app reads `blocks/birthdays.json` from its files directory. A generator of your choice writes it and sends a `birthdays` push (see Push refresh).
 
-    adb shell appops set app.firetvhome SYSTEM_ALERT_WINDOW allow
+    "birthdays": { "type": "block", "days": 30 }
 
-Test it without waiting for an event:
+Schema:
 
-    adb shell am broadcast -n app.firetvhome/.AlertReceiver -a app.firetvhome.DEBUG_ALERT --es title Test --ei minutes 10
+    {
+      "generated": "2026-01-01T00:00:00Z",
+      "source": "my-script",
+      "items": [
+        { "date": "2026-01-09", "name": "Alex", "title": "Alex's Birthday" }
+      ]
+    }
 
-`AlertReceiver` is exported so this works from adb. The debug action only shows a message. Remove the `DEBUG_ALERT` intent filter from the manifest if the TV is on a network you do not trust.
+`date` is the day of the next birthday (`YYYY-MM-DD`). The `name` is shown; when it is empty `title` is used. Items with a bad date or no name are skipped. Only the dates in the window are shown, so write each person's next occurrence.
 
-## Notifications
+iCal feed (`type` `ics`): a feed whose events are birthdays. The event title is shown as the name. Recurring yearly events are expanded.
 
-Grant access in Settings > Notification access, or over adb:
+    "birthdays": { "type": "ics", "url": "https://example.com/birthdays.ics", "days": 30 }
 
-    adb shell settings put secure enabled_notification_listeners app.firetvhome/app.firetvhome.NotifService
+Home Assistant calendar (`type` `ha`): a calendar entity such as the one for birthdays, needs `ha_url` and `ha_token`.
 
-`cmd notification allow_listener` is not implemented on Fire OS 6. To undo, run `adb shell settings delete secure enabled_notification_listeners`, if nothing else was in that setting.
+    "birthdays": { "type": "ha", "entity": "calendar.birthdays", "days": 30 }
+
+Google (`type` `google`): accepted so a config can name it, but not implemented. The app logs "unsupported" and the card shows no birthdays. Export the Google "Birthdays" calendar as an iCal feed or through Home Assistant and use `ics` or `ha` instead.
+
+## Removed features
+
+Older versions had a pre-event alert (an overlay and a notification before each timed event), a recent-notifications card with a notification listener, and a boot receiver that re-armed alarms. All of it is gone, together with the `SYSTEM_ALERT_WINDOW`, `RECEIVE_BOOT_COMPLETED`, exact alarm and `POST_NOTIFICATIONS` permissions, the `calendar_alert_minutes` key (now ignored) and the `DEBUG_ALERT` broadcast. The default APK has no notification listener and no boot receiver. If you granted the old listener, undo it with `adb shell settings delete secure enabled_notification_listeners` (if nothing else was in that setting). The experimental `-PswitchHome` build still declares `RECEIVE_BOOT_COMPLETED` for its own boot receiver.
 
 ## Setting it as the home screen on Fire OS
 

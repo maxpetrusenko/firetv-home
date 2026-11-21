@@ -8,9 +8,7 @@ import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextClock
-import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 /**
  * The home screen's view tree and the code that fills it. It holds no data and does no I/O: MainActivity feeds it,
@@ -30,7 +28,7 @@ class HomeScreen(private val ctx: Context, background: String) {
 
     private val calCard = Card(ctx, "Calendar")
     private val remCard = Card(ctx, "Reminders")
-    private val notCard = Card(ctx, "Notifications")
+    private val bdayCard = Card(ctx, "Birthdays")
     val appsRow = LinearLayout(ctx)
     val appsScroll = HorizontalScrollView(ctx)
     val view: View
@@ -49,15 +47,15 @@ class HomeScreen(private val ctx: Context, background: String) {
         val clockRow = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM }
         clock = TextClock(ctx).apply {
             format12Hour = "h:mm"; format24Hour = "HH:mm"
-            textSize = 84f; setTextColor(Ui.TEXT); includeFontPadding = false
+            textSize = 64f; setTextColor(Ui.TEXT); includeFontPadding = false
         }
         ampm = TextClock(ctx).apply {
             format12Hour = "a"; format24Hour = ""
-            textSize = 26f; setTextColor(Ui.DIM); includeFontPadding = false
+            textSize = 22f; setTextColor(Ui.DIM); includeFontPadding = false
         }
         date = TextClock(ctx).apply {
             format12Hour = "EEEE, MMMM d"; format24Hour = "EEEE, MMMM d"
-            textSize = 30f; setTextColor(Ui.DIM); includeFontPadding = false
+            textSize = 26f; setTextColor(Ui.DIM); includeFontPadding = false
         }
         clockRow.addView(clock)
         clockRow.addView(ampm, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = 10 * d; bottomMargin = 8 * d })
@@ -65,15 +63,17 @@ class HomeScreen(private val ctx: Context, background: String) {
         clockRow.addView(date, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = 12 * d })
         root.addView(clockRow, LinearLayout.LayoutParams(-1, -2))
 
-        // Cards
-        val cards = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; isBaselineAligned = false }
-        fun add(c: Card, w: Float, first: Boolean = false) =
-            cards.addView(c.view, LinearLayout.LayoutParams(0, -1, w).apply { if (!first) leftMargin = 16 * d })
-        add(calCard, 1f, true); add(remCard, 1f); add(notCard, 1.2f)
+        // Cards: calendar on the left (~60%), birthdays over reminders on the right.
         calCard.view.visibility = View.GONE
         remCard.view.visibility = View.GONE
-        notCard.view.visibility = View.GONE
-        root.addView(cards, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = 20 * d; bottomMargin = 20 * d })
+        bdayCard.view.visibility = View.GONE
+        val cards = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; isBaselineAligned = false }
+        cards.addView(calCard.view, LinearLayout.LayoutParams(0, -1, 6f))
+        val right = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+        right.addView(bdayCard.view, LinearLayout.LayoutParams(-1, -2))
+        right.addView(remCard.view, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = 12 * d })
+        cards.addView(right, LinearLayout.LayoutParams(0, -1, 4f).apply { leftMargin = 16 * d })
+        root.addView(cards, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = 12 * d; bottomMargin = 12 * d })
 
         // Apps row
         appsRow.apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, 3 * d, 0, 3 * d) }
@@ -91,29 +91,48 @@ class HomeScreen(private val ctx: Context, background: String) {
         view = frame
     }
 
-    /** [events] null means not loaded yet; [failed] says the last load failed. */
-    fun renderCalendar(show: Boolean, events: List<Ev>?, failed: Boolean, showLabels: Boolean, now: Long) {
+    /**
+     * [events] null means not loaded yet; [failed] says the last load failed. Events are grouped by day (today through
+     * [days] days ahead), all-day first, titles wrapped to 2 lines.
+     */
+    fun renderCalendar(show: Boolean, events: List<Ev>?, failed: Boolean, showLabels: Boolean, now: Long, days: Int = Config.DEFAULT_CAL_DAYS) {
         Ui.gone(calCard.view, !show)
         if (!show) return
+        val d = Ui.dp(ctx, 1)
         val b = calCard.body
         b.removeAllViews()
-        val today = Data.dayStart(now)
-        val ev = events?.filter { it.allDay || it.end > now || it.start >= now }
-            ?.sortedWith(compareBy({ Data.dayStart(maxOf(it.start, today)) }, { !it.allDay }, { it.start }))
-            ?: emptyList()
+        val groups = events?.let { CalendarLogic.groupByDay(it, now, days, java.util.TimeZone.getDefault()) } ?: emptyList()
         if (events == null) b.addView(Ui.text(ctx, if (failed) "Calendar unavailable" else "Loading...", 20f, Ui.DIM))
-        else if (ev.isEmpty()) b.addView(Ui.text(ctx, "No events this week", 20f, Ui.DIM))
-        else for (e in ev.take(6)) {
-            val day = Math.round((Data.dayStart(maxOf(e.start, today)) - today) / 86_400_000.0).toInt()
-            val label = when (day) { 0 -> "Today"; 1 -> "Tomorrow"; else -> SimpleDateFormat("EEE", Locale.getDefault()).format(Date(e.start)) }
-            val time = if (e.allDay) "All day" else DateFormat.getTimeFormat(ctx).format(Date(e.start))
-            val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-            row.addView(Ui.text(ctx, label, 15f, Ui.ACCENT, bold = true), LinearLayout.LayoutParams(Ui.dp(ctx, 90), -2))
-            row.addView(Ui.text(ctx, time, 15f, Ui.DIM), LinearLayout.LayoutParams(Ui.dp(ctx, 64), -2))
-            row.addView(Ui.text(ctx, e.title, 18f), LinearLayout.LayoutParams(0, -2, 1f))
-            if (showLabels && e.source.isNotEmpty())
-                row.addView(Ui.text(ctx, e.source, 13f, Ui.DIM), LinearLayout.LayoutParams(-2, -2).apply { leftMargin = Ui.dp(ctx, 8) })
-            b.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = Ui.dp(ctx, 6) })
+        else if (groups.isEmpty()) b.addView(Ui.text(ctx, "No upcoming events", 20f, Ui.DIM))
+        else for ((gi, g) in groups.withIndex()) {
+            b.addView(Ui.text(ctx, g.label, 15f, Ui.ACCENT, bold = true), LinearLayout.LayoutParams(-1, -2).apply { topMargin = (if (gi == 0) 0 else 8) * d })
+            for (e in g.events) {
+                val time = if (e.allDay) "All day" else DateFormat.getTimeFormat(ctx).format(Date(e.start))
+                val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
+                row.addView(Ui.text(ctx, time, 15f, Ui.DIM), LinearLayout.LayoutParams(Ui.dp(ctx, 84), -2))
+                row.addView(FitTextView(ctx, 18f, 13f).apply { text = e.title; setTextColor(Ui.TEXT) }, LinearLayout.LayoutParams(0, -2, 1f))
+                if (showLabels && e.source.isNotEmpty())
+                    row.addView(Ui.text(ctx, e.source, 13f, Ui.DIM), LinearLayout.LayoutParams(-2, -2).apply { leftMargin = 8 * d })
+                b.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 4 * d })
+            }
+        }
+        trimToFit(calCard, dayList = true)
+    }
+
+    /** [items] null means not loaded yet. Shows up to 5 birthdays within [days] days, soonest first. */
+    fun renderBirthdays(show: Boolean, items: List<Birthdays.Item>?, failed: Boolean, days: Int, now: Long) {
+        Ui.gone(bdayCard.view, !show)
+        if (!show) return
+        val d = Ui.dp(ctx, 1)
+        val b = bdayCard.body
+        b.removeAllViews()
+        if (items == null) b.addView(Ui.text(ctx, if (failed) "Birthdays unavailable" else "Loading...", 17f, Ui.DIM))
+        else {
+            val tz = java.util.TimeZone.getDefault()
+            val w = Birthdays.window(items, now, days, tz)
+            if (w.isEmpty()) b.addView(Ui.text(ctx, "No birthdays in the next $days days", 17f, Ui.DIM))
+            else for (i in w.take(5)) b.addView(FitTextView(ctx, 17f, 13f).apply { text = Birthdays.line(i, now, tz); setTextColor(Ui.TEXT) },
+                LinearLayout.LayoutParams(-1, -2).apply { topMargin = 3 * d })
         }
     }
 
@@ -129,26 +148,29 @@ class HomeScreen(private val ctx: Context, background: String) {
                 if (l.items.isEmpty() || budget <= 0) continue
                 b.addView(Ui.text(ctx, l.label, 15f, Ui.DIM, bold = true), LinearLayout.LayoutParams(-1, -2).apply { topMargin = Ui.dp(ctx, 6) })
                 val shown = l.items.take(maxOf(1, minOf(3, budget)))
-                for (it in shown) b.addView(Ui.text(ctx, "• $it", 20f))
+                for (it in shown) b.addView(Ui.text(ctx, "• $it", 18f))
                 budget -= shown.size
                 if (l.items.size > shown.size) b.addView(Ui.text(ctx, "+${l.items.size - shown.size} more", 15f, Ui.DIM))
             }
             if (b.childCount == 0) b.addView(Ui.text(ctx, "All done", 20f, Ui.DIM))
         }
+        trimToFit(remCard)
     }
 
-    /** [items] null hides the card (notification access not granted). */
-    fun renderNotifs(items: List<NotifService.Item>?) {
-        Ui.gone(notCard.view, items == null)
-        if (items == null) return
-        val b = notCard.body
-        b.removeAllViews()
-        if (items.isEmpty()) b.addView(Ui.text(ctx, "No recent notifications", 20f, Ui.DIM))
-        for (n in items) {
-            b.addView(Ui.text(ctx, n.app, 13f, Ui.DIM, bold = true), LinearLayout.LayoutParams(-1, -2).apply { topMargin = Ui.dp(ctx, 6) })
-            val head = n.title.ifEmpty { n.text }
-            b.addView(Ui.text(ctx, head, 19f, bold = true))
-            if (n.title.isNotEmpty() && n.text.isNotEmpty()) b.addView(Ui.text(ctx, n.text, 17f, Ui.DIM))
-        }
+    /** After layout, drop trailing rows that run past the card, and (day lists) a day header left without events. */
+    private fun trimToFit(c: Card, dayList: Boolean = false) {
+        val vto = c.view.viewTreeObserver
+        vto.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                val o = if (c.view.viewTreeObserver.isAlive) c.view.viewTreeObserver else vto
+                if (o.isAlive) o.removeOnGlobalLayoutListener(this)
+                if (c.view.height <= 0) return
+                val b = c.body
+                val avail = c.view.height - c.view.paddingBottom
+                var changed = false
+                while (b.childCount > 1 && b.top + b.getChildAt(b.childCount - 1).bottom > avail) { b.removeViewAt(b.childCount - 1); changed = true }
+                if (changed && dayList && b.childCount > 0 && b.getChildAt(b.childCount - 1) is android.widget.TextView) b.removeViewAt(b.childCount - 1)
+            }
+        })
     }
 }
