@@ -95,7 +95,7 @@ class HomeScreen(private val ctx: Context, background: String) {
      * [events] null means not loaded yet; [failed] says the last load failed. Events are grouped by day (today through
      * [days] days ahead), all-day first, titles wrapped to 2 lines.
      */
-    fun renderCalendar(show: Boolean, events: List<Ev>?, failed: Boolean, showLabels: Boolean, now: Long, days: Int = Config.DEFAULT_CAL_DAYS) {
+    fun renderCalendar(show: Boolean, events: List<Ev>?, failed: Boolean, showLabels: Boolean, now: Long, days: Int = Config.DEFAULT_CAL_DAYS, stripCodes: Boolean = true) {
         Ui.gone(calCard.view, !show)
         if (!show) return
         val d = Ui.dp(ctx, 1)
@@ -110,7 +110,7 @@ class HomeScreen(private val ctx: Context, background: String) {
                 val time = if (e.allDay) "All day" else DateFormat.getTimeFormat(ctx).format(Date(e.start))
                 val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
                 row.addView(Ui.text(ctx, time, 15f, Ui.DIM), LinearLayout.LayoutParams(Ui.dp(ctx, 84), -2))
-                row.addView(FitTextView(ctx, 18f, 13f).apply { text = e.title; setTextColor(Ui.TEXT) }, LinearLayout.LayoutParams(0, -2, 1f))
+                row.addView(FitTextView(ctx, 18f, 13f).apply { text = BookingCodes.strip(e.title, stripCodes); setTextColor(Ui.TEXT) }, LinearLayout.LayoutParams(0, -2, 1f))
                 if (showLabels && e.source.isNotEmpty())
                     row.addView(Ui.text(ctx, e.source, 13f, Ui.DIM), LinearLayout.LayoutParams(-2, -2).apply { leftMargin = 8 * d })
                 b.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 4 * d })
@@ -136,7 +136,7 @@ class HomeScreen(private val ctx: Context, background: String) {
         }
     }
 
-    fun renderReminders(show: Boolean, lists: List<TodoList>?, failed: Boolean) {
+    fun renderReminders(show: Boolean, lists: List<TodoList>?, failed: Boolean, stripCodes: Boolean = true) {
         Ui.gone(remCard.view, !show)
         if (!show) return
         val b = remCard.body
@@ -148,7 +148,7 @@ class HomeScreen(private val ctx: Context, background: String) {
                 if (l.items.isEmpty() || budget <= 0) continue
                 b.addView(Ui.text(ctx, l.label, 15f, Ui.DIM, bold = true), LinearLayout.LayoutParams(-1, -2).apply { topMargin = Ui.dp(ctx, 6) })
                 val shown = l.items.take(maxOf(1, minOf(3, budget)))
-                for (it in shown) b.addView(Ui.text(ctx, "• $it", 18f))
+                for (it in shown) b.addView(Ui.text(ctx, "• " + BookingCodes.strip(it, stripCodes), 18f))
                 budget -= shown.size
                 if (l.items.size > shown.size) b.addView(Ui.text(ctx, "+${l.items.size - shown.size} more", 15f, Ui.DIM))
             }

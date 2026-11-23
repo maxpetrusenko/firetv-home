@@ -133,8 +133,8 @@ class MainActivity : Activity(), Push.Listener {
 
     private fun render() {
         val now = System.currentTimeMillis()
-        screen.renderCalendar(cfg.hasCalendar, events, calErr, cfg.showCalLabels, now, cfg.calDays)
+        screen.renderCalendar(cfg.hasCalendar, events, calErr, cfg.showCalLabels, now, cfg.calDays, cfg.stripBookingCodes)
         screen.renderBirthdays(cfg.birthdays != null, bdays, bdayErr, cfg.birthdays?.days ?: Config.DEFAULT_BDAY_DAYS, now)
-        screen.renderReminders(cfg.hasTodos, todos, todoErr)
+        screen.renderReminders(cfg.hasTodos, todos, todoErr, cfg.stripBookingCodes)
     }
 }

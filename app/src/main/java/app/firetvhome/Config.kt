@@ -30,6 +30,8 @@ class Config(
     val includeExceptions: List<String> = emptyList(),
     val calDays: Int = DEFAULT_CAL_DAYS,
     val birthdays: BirthdayCfg? = null,
+    /** Display-only: strip booking codes ("conf ABC123", "PNR XYZ789") from titles. Key strip_booking_codes, default true. */
+    val stripBookingCodes: Boolean = true,
 ) {
     val haReady get() = haUrl.isNotEmpty() && haToken.isNotEmpty()
     val hasCalendar get() = calendars.isNotEmpty()
@@ -129,6 +131,7 @@ class Config(
                 if (apps.isEmpty()) DEFAULT_APPS else apps,
                 if (bg == BG_BALI) BG_BALI else BG_DEFAULT,
                 list("exclude"), list("include_exceptions"), days, bd,
+                j.optBoolean("strip_booking_codes", true),
             )
         }
 

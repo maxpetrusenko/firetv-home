@@ -10,7 +10,7 @@ Rendered off-device with Paparazzi from the app's real views and invented demo d
 
 - Clock and date, following the system 12/24 hour setting.
 - Two-column home: the calendar on the left, Birthdays above Reminders on the right.
-- Calendar card: today plus the next `days` days (default 8), grouped by day with headers "Today", "Tomorrow" and "Tue Nov 24". All-day events come first in each day. Titles wrap to two lines with no ellipsis; a long title steps its font size down until it fits. Rows that do not fit the card are dropped. Sources are merged, then filtered. Providers: any iCal (`.ics`) feed, including a Google Calendar "secret address", or a Home Assistant calendar entity. When more than one source is configured, each row shows the source label.
+- Calendar card: today plus the next `days` days (default 8), grouped by day with headers "Today", "Tomorrow" and "Tue Nov 24". All-day events come first in each day. Titles never get an ellipsis: they wrap to two lines, a long title steps its font size down until it fits, and one that still does not fit wraps onto more lines. Rows that do not fit the card are dropped. Sources are merged, then filtered. Providers: any iCal (`.ics`) feed, including a Google Calendar "secret address", or a Home Assistant calendar entity. When more than one source is configured, each row shows the source label.
 - Calendar filter: hide events by title with case-insensitive regular expressions (`exclude`), with `include_exceptions` to keep some of them.
 - Birthdays card: upcoming birthdays within a window (default 30 days) from a pushed file, an iCal feed or a Home Assistant calendar. Hidden when not configured.
 - Reminders card: incomplete items from Home Assistant todo lists, or from Apple Reminders through an optional macOS helper.
@@ -57,6 +57,7 @@ The config is read again on every refresh (on resume, on a push, and every 15 mi
 | `calendar.days` | integer | `8` | Days shown, starting today. Clamped to 1-31. |
 | `calendar.exclude` | list of strings | empty | Events whose title matches any entry are hidden. Each entry is a case-insensitive regular expression; an entry that is not a valid regex is matched as plain text. |
 | `calendar.include_exceptions` | list of strings | empty | Events that match an `exclude` entry but also match one of these are kept. Same matching rules. |
+| `strip_booking_codes` | boolean | `true` | Top level. Hides booking codes such as `conf ABC123`, `Conf: ABC123`, `confirmation ABC123` or `PNR ABC123` (5-8 uppercase letters or digits) from event and reminder titles on screen. Display only; the source is unchanged. |
 | `birthdays` | object | none | Birthdays source, see below. The card is hidden when this is missing. |
 | `app_order` | list of strings | a short built-in list | Package names for the app row. Missing apps are skipped. The first one gets focus. |
 | `calendar_entity` | string | empty | Old flat key. Home Assistant calendar entity id. Same as one `ha_calendar` provider. |
