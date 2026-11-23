@@ -93,4 +93,18 @@ class CalendarLogicTest {
         assertEquals(13f, TextFit.pick(18f, 13f, 1f, 2, lines(400)), 0f)      // never fits: floor
         assertEquals(18f, TextFit.pick(18f, 13f, 1f, 2, lines(5)), 0f)
     }
+
+    @Test fun nextDayFlightsSurviveGroupingAndBookingCodeStrip() {
+        val now = t("2026-11-22 23:30")
+        val evs = listOf(
+            timed("Flight AAA to BBB (team offsite) conf ABC123", "2026-11-23 08:08"),
+            timed("Flight BBB to AAA conf XYZ789", "2026-11-23 21:24"),
+        )
+        val g = CalendarLogic.groupByDay(CalendarLogic.filter(evs, exclude, include), now, 8, tz, Locale.US)
+        assertEquals(listOf("Tomorrow"), g.map { it.label })
+        assertEquals(
+            listOf("Flight AAA to BBB (team offsite)", "Flight BBB to AAA"),
+            g[0].events.map { BookingCodes.strip(it.title) },
+        )
+    }
 }

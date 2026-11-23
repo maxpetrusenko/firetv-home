@@ -76,3 +76,24 @@ object TextFit {
         return minSp
     }
 }
+
+/**
+ * Pure overflow plan for a card body. Rows are in order; each has a bottom edge (px, card coordinates) and a
+ * weight: 0 for a day/list header, 1 for an event or item row, n for an existing "+n more" row.
+ * Nothing is dropped silently: [keep] says how many leading rows stay and [hidden] how many items went, so the
+ * caller shows one "+N more" line in the space it reserved.
+ */
+object TrimPlan {
+    class Result(val keep: Int, val hidden: Int)
+
+    /** [avail] is the bottom limit; [moreH] the height reserved for the "+N more" line when something is hidden. */
+    fun plan(bottoms: List<Int>, weights: List<Int>, avail: Int, moreH: Int): Result {
+        val n = bottoms.size
+        if (n == 0 || bottoms[n - 1] <= avail) return Result(n, 0)
+        var k = n
+        while (k > 1 && bottoms[k - 1] + moreH > avail) k--
+        while (k > 1 && weights[k - 1] == 0) k-- // never leave a header without its first item
+        val hidden = weights.drop(k).sum()
+        return Result(k, hidden)
+    }
+}

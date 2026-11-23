@@ -113,10 +113,11 @@ class HomeScreen(private val ctx: Context, background: String) {
                 row.addView(FitTextView(ctx, 18f, 13f).apply { text = BookingCodes.strip(e.title, stripCodes); setTextColor(Ui.TEXT) }, LinearLayout.LayoutParams(0, -2, 1f))
                 if (showLabels && e.source.isNotEmpty())
                     row.addView(Ui.text(ctx, e.source, 13f, Ui.DIM), LinearLayout.LayoutParams(-2, -2).apply { leftMargin = 8 * d })
+                row.tag = 1 // item weight for TrimPlan
                 b.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 4 * d })
             }
         }
-        trimToFit(calCard, dayList = true)
+        trimToFit(calCard)
     }
 
     /** [items] null means not loaded yet. Shows up to 5 birthdays within [days] days, soonest first. */
@@ -148,17 +149,20 @@ class HomeScreen(private val ctx: Context, background: String) {
                 if (l.items.isEmpty() || budget <= 0) continue
                 b.addView(Ui.text(ctx, l.label, 15f, Ui.DIM, bold = true), LinearLayout.LayoutParams(-1, -2).apply { topMargin = Ui.dp(ctx, 6) })
                 val shown = l.items.take(maxOf(1, minOf(3, budget)))
-                for (it in shown) b.addView(Ui.text(ctx, "• " + BookingCodes.strip(it, stripCodes), 18f))
+                for (it in shown) b.addView(Ui.text(ctx, "• " + BookingCodes.strip(it, stripCodes), 18f).apply { tag = 1 })
                 budget -= shown.size
-                if (l.items.size > shown.size) b.addView(Ui.text(ctx, "+${l.items.size - shown.size} more", 15f, Ui.DIM))
+                if (l.items.size > shown.size) b.addView(Ui.text(ctx, "+${l.items.size - shown.size} more", 15f, Ui.DIM).apply { tag = l.items.size - shown.size })
             }
             if (b.childCount == 0) b.addView(Ui.text(ctx, "All done", 20f, Ui.DIM))
         }
         trimToFit(remCard)
     }
 
-    /** After layout, drop trailing rows that run past the card, and (day lists) a day header left without events. */
-    private fun trimToFit(c: Card, dayList: Boolean = false) {
+    /**
+     * After layout, rows that run past the card are replaced by one "+N more" line (TrimPlan): items are never dropped
+     * silently, and a day header is never left without its first item. Row weights come from View.tag (Int; none = header).
+     */
+    private fun trimToFit(c: Card) {
         val vto = c.view.viewTreeObserver
         vto.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
             override fun onGlobalLayout() {
@@ -167,9 +171,12 @@ class HomeScreen(private val ctx: Context, background: String) {
                 if (c.view.height <= 0) return
                 val b = c.body
                 val avail = c.view.height - c.view.paddingBottom
-                var changed = false
-                while (b.childCount > 1 && b.top + b.getChildAt(b.childCount - 1).bottom > avail) { b.removeViewAt(b.childCount - 1); changed = true }
-                if (changed && dayList && b.childCount > 0 && b.getChildAt(b.childCount - 1) is android.widget.TextView) b.removeViewAt(b.childCount - 1)
+                val rows = (0 until b.childCount).map { b.getChildAt(it) }
+                val moreH = Ui.dp(ctx, 26)
+                val r = TrimPlan.plan(rows.map { b.top + it.bottom }, rows.map { (it.tag as? Int) ?: 0 }, avail, moreH)
+                if (r.hidden == 0 && r.keep == rows.size) return
+                for (i in rows.size - 1 downTo r.keep) b.removeViewAt(i)
+                if (r.hidden > 0) b.addView(Ui.text(ctx, "+${r.hidden} more", 15f, Ui.DIM), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 4 * Ui.dp(ctx, 1) })
             }
         })
     }
