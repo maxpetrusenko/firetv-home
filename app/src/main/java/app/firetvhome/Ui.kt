@@ -12,7 +12,6 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.os.Handler
 import android.os.Looper
-import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -68,11 +67,11 @@ object Ui {
 
     fun dp(c: Context, v: Int) = (v * c.resources.displayMetrics.density + 0.5f).toInt()
 
-    fun text(c: Context, s: CharSequence, sp: Float, color: Int = TEXT, bold: Boolean = false, lines: Int = 1) =
+    fun text(c: Context, s: CharSequence, sp: Float, color: Int = TEXT, bold: Boolean = false, lines: Int = Int.MAX_VALUE) =
         TextView(c).apply {
             text = s; textSize = sp; setTextColor(color)
             if (bold) setTypeface(Typeface.DEFAULT, Typeface.BOLD)
-            maxLines = lines; ellipsize = TextUtils.TruncateAt.END
+            maxLines = lines // never ellipsize: long text wraps
             includeFontPadding = false
         }
 
@@ -156,6 +155,9 @@ class FitTextView(c: Context, private val maxSp: Float, private val minSp: Float
                 android.text.StaticLayout.Builder.obtain(text, 0, text.length, p, w).build().lineCount
             }
             setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, sp)
+            // Still too long at the smallest size: wrap further instead of cutting the title.
+            p.textSize = sp * dm.scaledDensity
+            if (android.text.StaticLayout.Builder.obtain(text, 0, text.length, p, w).build().lineCount > fitLines) maxLines = Int.MAX_VALUE
         }
         super.onMeasure(widthSpec, heightSpec)
     }
