@@ -131,8 +131,17 @@ class MainActivity : Activity(), Push.Listener {
         }
     }
 
+    private var renderKey = ""
+
     private fun render() {
         val now = System.currentTimeMillis()
+        // A refresh with unchanged data must not rebuild the views: each rebuild re-lays-out and re-rasterizes all text (GPU memory churn).
+        val key = listOf(
+            System.identityHashCode(events), System.identityHashCode(todos), System.identityHashCode(bdays), calErr, todoErr, bdayErr,
+            cfg.hasCalendar, cfg.hasTodos, cfg.showCalLabels, cfg.birthdays?.days, cfg.calDays, cfg.stripBookingCodes, now / 300_000L,
+        ).joinToString("|")
+        if (key == renderKey) return
+        renderKey = key
         screen.renderCalendar(cfg.hasCalendar, events, calErr, cfg.showCalLabels, now, cfg.calDays, cfg.stripBookingCodes)
         screen.renderBirthdays(cfg.birthdays != null, bdays, bdayErr, cfg.birthdays?.days ?: Config.DEFAULT_BDAY_DAYS, now)
         screen.renderReminders(cfg.hasTodos, todos, todoErr, cfg.stripBookingCodes)

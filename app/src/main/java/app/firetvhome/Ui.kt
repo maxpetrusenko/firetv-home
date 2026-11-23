@@ -46,9 +46,8 @@ object Ui {
             val dm = c.resources.displayMetrics
             val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeResource(c.resources, res, o)
-            var s = 1
             // Half screen resolution is enough: the photo sits under a dark overlay and is scaled up with CENTER_CROP.
-            while (o.outWidth / (s * 2) >= dm.widthPixels / 2 && o.outHeight / (s * 2) >= dm.heightPixels / 2) s *= 2
+            val s = BgDecode.sampleSize(o.outWidth, o.outHeight, dm.widthPixels, dm.heightPixels)
             val d = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565; inSampleSize = s }
             photo = BitmapFactory.decodeResource(c.resources, res, d)
         } catch (e: Throwable) { }
