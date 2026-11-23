@@ -185,7 +185,17 @@ class HomeScreen(private val ctx: Context, background: String) {
             val b = c.body
             val rows = (0 until b.childCount).map { b.getChildAt(it) }
             val moreH = Ui.dp(ctx, 26)
-            val r = TrimPlan.plan(rows.map { b.top + it.bottom }, rows.map { (it.tag as? Int) ?: 0 }, avail, moreH)
+            // A vertical LinearLayout clamps the last rows to the space left (half-cut text whose bottom still "fits"):
+            // plan with each row's natural height instead of its laid-out bottom.
+            var y = b.top
+            val wSpec = View.MeasureSpec.makeMeasureSpec(b.width, View.MeasureSpec.EXACTLY)
+            val hSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            val bottoms = rows.map {
+                it.measure(wSpec, hSpec)
+                y += ((it.layoutParams as? LinearLayout.LayoutParams)?.topMargin ?: 0) + it.measuredHeight
+                y
+            }
+            val r = TrimPlan.plan(bottoms, rows.map { (it.tag as? Int) ?: 0 }, avail, moreH)
             if (r.hidden == 0 && r.keep == rows.size) return@addOnGlobalLayoutListener
             for (i in rows.size - 1 downTo r.keep) b.removeViewAt(i)
             if (r.hidden > 0) b.addView(Ui.text(ctx, "+${r.hidden} more", 15f, Ui.DIM), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 4 * Ui.dp(ctx, 1) })
