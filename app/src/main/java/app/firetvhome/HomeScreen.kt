@@ -16,6 +16,9 @@ import java.util.Date
  */
 class HomeScreen(private val ctx: Context, background: String) {
     private class Card(a: Context, title: String) {
+        var pending = false      // rows were just rebuilt: the next layout must trim them
+        var appliedAvail = -1    // card height the last trim was computed for
+        var listening = false
         val body = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL }
         val view = LinearLayout(a).apply {
             orientation = LinearLayout.VERTICAL
@@ -32,6 +35,8 @@ class HomeScreen(private val ctx: Context, background: String) {
     val appsRow = LinearLayout(ctx)
     val appsScroll = HorizontalScrollView(ctx)
     val view: View
+    /** Called (on the main thread) when a card's available height changed after its rows were trimmed: the owner should render again. */
+    var onRelayout: (() -> Unit)? = null
     lateinit var clock: TextClock; private set
     lateinit var ampm: TextClock; private set
     lateinit var date: TextClock; private set
@@ -161,23 +166,29 @@ class HomeScreen(private val ctx: Context, background: String) {
     /**
      * After layout, rows that run past the card are replaced by one "+N more" line (TrimPlan): items are never dropped
      * silently, and a day header is never left without its first item. Row weights come from View.tag (Int; none = header).
+     * The listener stays installed: when a sibling card changes size later (birthdays loading -> loaded), the card's
+     * available height changes and [onRelayout] asks the owner to rebuild and trim again for the new height.
      */
     private fun trimToFit(c: Card) {
-        val vto = c.view.viewTreeObserver
-        vto.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
-            override fun onGlobalLayout() {
-                val o = if (c.view.viewTreeObserver.isAlive) c.view.viewTreeObserver else vto
-                if (o.isAlive) o.removeOnGlobalLayoutListener(this)
-                if (c.view.height <= 0) return
-                val b = c.body
-                val avail = c.view.height - c.view.paddingBottom
-                val rows = (0 until b.childCount).map { b.getChildAt(it) }
-                val moreH = Ui.dp(ctx, 26)
-                val r = TrimPlan.plan(rows.map { b.top + it.bottom }, rows.map { (it.tag as? Int) ?: 0 }, avail, moreH)
-                if (r.hidden == 0 && r.keep == rows.size) return
-                for (i in rows.size - 1 downTo r.keep) b.removeViewAt(i)
-                if (r.hidden > 0) b.addView(Ui.text(ctx, "+${r.hidden} more", 15f, Ui.DIM), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 4 * Ui.dp(ctx, 1) })
+        c.pending = true
+        if (c.listening) return
+        c.listening = true
+        c.view.viewTreeObserver.addOnGlobalLayoutListener {
+            if (c.view.height <= 0) return@addOnGlobalLayoutListener
+            val avail = c.view.height - c.view.paddingBottom
+            if (!c.pending) {
+                if (avail != c.appliedAvail) Ui.main.post { onRelayout?.invoke() }
+                return@addOnGlobalLayoutListener
             }
-        })
+            c.pending = false
+            c.appliedAvail = avail
+            val b = c.body
+            val rows = (0 until b.childCount).map { b.getChildAt(it) }
+            val moreH = Ui.dp(ctx, 26)
+            val r = TrimPlan.plan(rows.map { b.top + it.bottom }, rows.map { (it.tag as? Int) ?: 0 }, avail, moreH)
+            if (r.hidden == 0 && r.keep == rows.size) return@addOnGlobalLayoutListener
+            for (i in rows.size - 1 downTo r.keep) b.removeViewAt(i)
+            if (r.hidden > 0) b.addView(Ui.text(ctx, "+${r.hidden} more", 15f, Ui.DIM), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 4 * Ui.dp(ctx, 1) })
+        }
     }
 }

@@ -35,6 +35,7 @@ class MainActivity : Activity(), Push.Listener {
         screen = HomeScreen(this, cfg.background)
         appsRow = screen.appsRow
         appsScroll = screen.appsScroll
+        screen.onRelayout = { renderKey = ""; render() }
         val frame = screen.view
         setContentView(frame)
         buildApps()
